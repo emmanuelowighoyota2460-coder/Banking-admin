@@ -1,0 +1,245 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum TransactionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  FAILED
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER
+}
+
+enum CardStatus {
+  ACTIVE
+  BLOCKED
+  EXPIRED
+  INACTIVE
+}
+
+enum LoanStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ACTIVE
+  COMPLETED
+  DEFAULTED
+}
+
+enum InvestmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  address       String?
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ACTIVE)
+  balance       Float      @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  deposits      Deposit[]
+  withdrawals   Withdrawal[]
+  sentTransfers     Transfer[]     @relation("SentTransfers")
+  receivedTransfers Transfer[]     @relation("ReceivedTransfers")
+  investmentSubscriptions InvestmentSubscription[]
+  cards         Card[]
+  loans         Loan[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Deposit {
+  id            String            @id @default(cuid())
+  userId        String
+  amount        Float
+  currency      String            @default("USD")
+  method        String
+  transactionId String            @unique
+  status        TransactionStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([transactionId])
+}
+
+model Withdrawal {
+  id            String            @id @default(cuid())
+  userId        String
+  amount        Float
+  currency      String            @default("USD")
+  method        String
+  accountInfo   String
+  transactionId String            @unique
+  status        TransactionStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([transactionId])
+}
+
+model Transfer {
+  id            String          @id @default(cuid())
+  fromUserId    String
+  toUserId      String
+  amount        Float
+  currency      String          @default("USD")
+  type          TransactionType @default(TRANSFER)
+  description   String?
+  transactionId String          @unique
+  status        TransactionStatus @default(COMPLETED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  fromUser User @relation("SentTransfers", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ReceivedTransfers", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@index([createdAt])
+  @@index([transactionId])
+}
+
+model InvestmentPlan {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  minAmount     Float
+  maxAmount     Float
+  roi           Float    // Return on Investment percentage
+  duration      Int      // Duration in days
+  status        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions InvestmentSubscription[]
+
+  @@index([name])
+  @@index([status])
+}
+
+model InvestmentSubscription {
+  id          String           @id @default(cuid())
+  userId      String
+  planId      String
+  amount      Float
+  startDate   DateTime         @default(now())
+  endDate     DateTime
+  expectedReturn Float
+  status      InvestmentStatus @default(ACTIVE)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan InvestmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+}
+
+model Card {
+  id           String     @id @default(cuid())
+  userId       String
+  cardNumber   String     @unique
+  cardHolder   String
+  expiryDate   String
+  cvv          String
+  cardType     String     // Visa, MasterCard, etc.
+  creditLimit  Float      @default(0)
+  balance      Float      @default(0)
+  status       CardStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([cardNumber])
+  @@index([status])
+}
+
+model Loan {
+  id           String     @id @default(cuid())
+  userId       String
+  amount       Float
+  interestRate Float
+  term         Int        // Term in months
+  purpose      String
+  status       LoanStatus @default(PENDING)
+  approvedAt   DateTime?
+  dueDate      DateTime?
+  paidAmount   Float      @default(0)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Setting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+
+  @@index([key])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+}
